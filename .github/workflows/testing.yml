@@ -1,0 +1,51 @@
+name: Build Testing
+
+on:
+  pull_request:
+    types: [assigned, opened, synchronize, reopened]
+    branches:
+    - '**'
+
+jobs:
+  cleaner:
+    runs-on: [self-hosted, linux, systemtest] #ubuntu-latest
+    steps:
+      - name: Runner workspace path
+        run: |
+          echo "Cleaning up previous run"
+          rm -rf "${{ github.workspace }}"
+  test:
+    runs-on: [self-hosted, linux, systemtest]
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Setup .NET Core
+        uses: actions/setup-dotnet@v1.7.2
+        with:
+          source-url: https://nuget.pkg.github.com/EpitomeGlobal/index.json
+          dotnet-version: 5.0.x
+        env:
+          NUGET_AUTH_TOKEN: ${{ secrets.GPR_READ }}
+      - name: Restore tools
+        run: dotnet tool restore
+      - name: Get Pull Number
+        id: getPr
+        run: echo ::set-output name=number::$(echo $GITHUB_REF | cut -d / -f 3)
+      - name: Initiate Sonar Scan
+        run: >
+          dotnet sonarscanner begin /k:"${{ secrets.SONARQUBE_KEY }}"
+          /d:sonar.host.url="${{ secrets.SONARQUBE_HOST }}"
+          /d:sonar.login="${{ secrets.SONARQUBE_TOKEN }}"
+          /d:sonar.pullrequest.key="${{ steps.getPr.outputs.number }}"
+          /d:sonar.pullrequest.branch="${{ github.head_ref }}"
+          /d:sonar.pullrequest.base="${{ github.base_ref }}"
+          /d:sonar.cs.opencover.reportsPaths=**/coverage.opencover.xml
+      - name: Install dependencies
+        run: dotnet restore
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+      - name: Test
+        run: dotnet test --configuration Release --no-restore /p:CollectCoverage=true /p:CoverletOutputFormat=opencover
+      - name: Finalize Sonar Scan
+        run: dotnet sonarscanner end /d:sonar.login="${{ secrets.SONARQUBE_TOKEN }}"

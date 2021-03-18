@@ -1,0 +1,18 @@
+<Project>
+  <PropertyGroup>
+    <CodeAnalysisRuleSet>$(MSBuildThisFileDirectory)SourceCode.ruleset</CodeAnalysisRuleSet>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Company>Epitome Global Pte Ltd</Company>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+	<PackageProjectUrl>{CHANGE_THIS}</PackageProjectUrl>
+    <RepositoryUrl>{CHANGE_THIS}</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <NoWarn>NU5105</NoWarn>
+    <Features>strict</Features>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <NullableReferenceTypes>true</NullableReferenceTypes>
+    <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
+    <PackageOutputPath>$(SolutionDir)packages</PackageOutputPath>
+  </PropertyGroup>
+</Project>

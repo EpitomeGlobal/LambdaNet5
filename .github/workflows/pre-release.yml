@@ -1,0 +1,81 @@
+name: "pre-release"
+
+on:
+  push:
+    branches:
+      - master
+
+#172.17.0.1
+jobs:
+  cleaner:
+    runs-on: [self-hosted, linux, systemtest] #ubuntu-latest
+    steps:
+      - name: Runner workspace path
+        run: |
+          echo "Cleaning up previous run"
+          rm -rf "${{ github.workspace }}"
+  build:
+    runs-on: [self-hosted, linux, systemtest] #ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Setup .NET Core
+        uses: actions/setup-dotnet@v1.7.2
+        with:
+          source-url: https://nuget.pkg.github.com/EpitomeGlobal/index.json
+          dotnet-version: 5.0.x
+        env:
+          NUGET_AUTH_TOKEN: ${{ secrets.GPR_READ }}
+      - name: Restore tools
+        run: dotnet tool restore
+      - uses: actions/checkout@v2
+      - name: Bump version and push tag
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v5.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          release_branches: release/*
+          pre_release_branches: master
+          default_bump: release
+          append_to_pre_release_tag: rc
+          dry_run: true
+      - name: Extract branch name
+        shell: bash
+        run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
+        id: extract_branch
+      - name: Initiate Sonar Scan
+        run: >
+          dotnet sonarscanner begin /k:"${{ secrets.SONARQUBE_KEY }}"
+          /d:sonar.host.url="${{ secrets.SONARQUBE_HOST }}"
+          /d:sonar.login="${{ secrets.SONARQUBE_TOKEN }}"
+          /d:sonar.branch.name=${{ steps.extract_branch.outputs.branch }}
+          /d:sonar.cs.opencover.reportsPaths=**/coverage.opencover.xml
+          /v:${{ steps.tag_version.outputs.new_tag }}
+      - name: Install dependencies
+        run: dotnet restore
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+      - name: Test
+        run: dotnet test --configuration Release --no-restore /p:CollectCoverage=true /p:CoverletOutputFormat=opencover
+      - name: Finalize Sonar Scan
+        run: dotnet sonarscanner end /d:sonar.login="${{ secrets.SONARQUBE_TOKEN }}"
+      - name: Push RC Tag
+        uses: mathieudutour/github-tag-action@v5.2
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          release_branches: release/*
+          pre_release_branches: master
+          default_bump: release
+          append_to_pre_release_tag: rc
+      # only release actual tag if everything works.
+      - name: Replace Latest Tag
+        uses: marvinpinto/action-automatic-releases@latest
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          automatic_release_tag: latest
+          prerelease: true
+          title: "Development Build"
+          files: |
+            LICENSE.txt
+            ./packages/*.nupkg
